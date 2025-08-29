@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Bình Assistant</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --accent-color: #5a67d8;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --bg-primary: #f7fafc;
+            --bg-secondary: #ffffff;
+            --bg-user: linear-gradient(135deg, #667eea20, #764ba220);
+            --bg-assistant: #f8f9ff;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --safe-area-inset-top: env(safe-area-inset-top);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom);
+            --safe-area-inset-left: env(safe-area-inset-left);
+            --safe-area-inset-right: env(safe-area-inset-right);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { height: 100%; overscroll-behavior: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+            background: var(--bg-primary);
+            height: 100vh; height: 100dvh;
+            min-height: 100vh; min-height: 100dvh;
+            overflow: hidden; display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+            padding-top: var(--safe-area-inset-top); padding-bottom: var(--safe-area-inset-bottom);
+            padding-left: var(--safe-area-inset-left); padding-right: var(--safe-area-inset-right);
+            -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+            -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+        }
+        #user-input, .message-text, .chat-box {
+            -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; user-select: text;
+        }
+        .header {
+            background: var(--bg-secondary); padding: clamp(0.75rem, 2vh, 1rem) clamp(1rem, 4vw, 1.5rem);
+            border-bottom: 1px solid var(--border-color); box-shadow: var(--shadow-sm);
+            flex-shrink: 0; z-index: 10; position: relative;
+        }
+        .header h1 {
+            background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; font-size: clamp(1.125rem, 3.5vw, 1.75rem);
+            font-weight: 700; text-align: center; letter-spacing: -0.025em; line-height: 1.2;
+        }
+        .chat-container { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 0 clamp(0.5rem, 2vw, 1rem); overflow: hidden; }
+        .chat-box {
+            flex: 1; background: var(--bg-secondary); border-radius: var(--border-radius);
+            margin: clamp(0.5rem, 2vh, 1rem) 0; padding: clamp(0.75rem, 3vw, 1.5rem);
+            overflow-y: auto; overflow-x: hidden; box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color); scroll-behavior: smooth; min-height: 0;
+            -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+        }
+        .chat-box::-webkit-scrollbar { width: 4px; }
+        .chat-box::-webkit-scrollbar-track { background: transparent; }
+        .chat-box::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--primary-color), var(--secondary-color)); border-radius: 2px; }
+        .message { margin-bottom: clamp(0.75rem, 3vw, 1.5rem); display: flex; flex-direction: column; animation: fadeInUp 0.4s ease-out; }
+        .message:last-child { margin-bottom: 0; }
+        .message-content {
+            max-width: min(85%, 400px); padding: clamp(0.75rem, 3vw, 1.25rem);
+            border-radius: var(--border-radius); position: relative;
+            word-wrap: break-word; word-break: break-word; line-height: 1.6;
+        }
+        .user-message .message-content { background: var(--bg-user); border: 1px solid rgba(102, 126, 234, 0.2); margin-left: auto; border-bottom-right-radius: 4px; }
+        .assistant-message .message-content { background: var(--bg-assistant); border: 1px solid var(--border-color); margin-right: auto; border-bottom-left-radius: 4px; }
+        .message-header { font-size: clamp(0.7rem, 2.5vw, 0.75rem); font-weight: 600; margin-bottom: 0.5rem; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.05em; }
+        .user-message .message-header { color: var(--primary-color); text-align: right; }
+        .assistant-message .message-header { color: var(--secondary-color); text-align: left; }
+        .message-text { color: var(--text-primary); font-size: clamp(0.875rem, 3.5vw, 0.95rem); }
+        .message-text p { margin-bottom: 0.75rem; }
+        .message-text p:last-child { margin-bottom: 0; }
+        .message-text ul, .message-text ol { padding-left: 1.25rem; margin-bottom: 0.75rem; }
+        .message-text li { margin-bottom: 0.25rem; }
+        .message-text strong { color: var(--text-primary); font-weight: 600; }
+        .message-text a { color: var(--accent-color); text-decoration: none; }
+        .message-text a:hover { text-decoration: underline; }
+        .loading-message {
+            display: flex; align-items: center; gap: 0.75rem; padding: clamp(0.75rem, 3vw, 1.25rem);
+            background: var(--bg-assistant); border: 1px solid var(--border-color);
+            border-radius: var(--border-radius); border-bottom-left-radius: 4px;
+            max-width: min(85%, 400px); margin-bottom: clamp(0.75rem, 3vw, 1.5rem);
+        }
+        .loading-text { color: var(--text-secondary); font-size: clamp(0.8rem, 3vw, 0.9rem); font-weight: 500; }
+        .loading-dots { display: flex; gap: 4px; }
+        .loading-dot { width: 6px; height: 6px; background: var(--primary-gradient); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+        .input-container {
+            background: var(--bg-secondary); border-radius: 24px; padding: clamp(0.5rem, 2vw, 0.75rem);
+            margin: 0 0 clamp(0.5rem, 2vh, 1rem) 0; border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm); flex-shrink: 0; position: relative;
+        }
+        .input-wrapper { display: flex; gap: clamp(0.375rem, 1.5vw, 0.5rem); align-items: center; }
+        .text-input-wrapper { flex: 1; position: relative; }
+        #user-input {
+            width: 100%; padding: clamp(0.625rem, 2.5vw, 0.75rem) clamp(0.75rem, 3vw, 1rem);
+            border: none; border-radius: 18px; font-size: clamp(0.875rem, 3.5vw, 1rem);
+            font-family: inherit; line-height: 1.5; color: var(--text-primary); background: var(--bg-primary);
+            transition: var(--transition); resize: none; min-height: clamp(36px, 8vw, 44px);
+            max-height: clamp(80px, 20vw, 120px); -webkit-appearance: none; -webkit-border-radius: 18px;
+        }
+        #user-input:focus { outline: none; background: var(--bg-secondary); box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2); }
+        #user-input::placeholder { color: var(--text-secondary); }
+        .btn {
+            padding: clamp(0.5rem, 2vw, 0.75rem); border: none; border-radius: 50%;
+            font-size: clamp(0.9rem, 3.5vw, 1.1rem); cursor: pointer; transition: var(--transition);
+            display: flex; align-items: center; justify-content: center;
+            min-width: clamp(36px, 8vw, 44px); min-height: clamp(36px, 8vw, 44px);
+            position: relative; overflow: hidden; touch-action: manipulation;
+        }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-primary { background: var(--primary-gradient); color: white; box-shadow: var(--shadow-sm); }
+        .btn-primary:hover:not(:disabled) { transform: scale(1.05); box-shadow: var(--shadow-md); }
+        .btn-secondary { background: var(--bg-primary); color: var(--primary-color); border: 1px solid var(--border-color); }
+        .btn-secondary:hover:not(:disabled) { background: var(--primary-color); color: white; transform: scale(1.05); }
+        .btn-recording { background: linear-gradient(135deg, #e53e3e, #c53030); color: white; animation: pulse 2s infinite; }
+        .error-message {
+            background: linear-gradient(135deg, #fed7d7, #feb2b2); color: #c53030;
+            padding: clamp(0.75rem, 3vw, 1.25rem); border-radius: var(--border-radius);
+            border: 1px solid #fca5a5; margin-bottom: clamp(0.75rem, 3vw, 1.5rem);
+            font-weight: 500; display: flex; align-items: center; gap: 0.75rem;
+            font-size: clamp(0.8rem, 3vw, 0.9rem);
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(229, 62, 62, 0); } 100% { box-shadow: 0 0 0 0 rgba(229, 62, 62, 0); } }
+        @media screen and (max-width: 768px) { body { min-height: -webkit-fill-available; } .header { position: sticky; top: 0; z-index: 100; } .chat-box { scroll-padding-bottom: 20px; } .message-content { max-width: 90%; } }
+        @media (prefers-color-scheme: dark) { :root { --text-primary: #e2e8f0; --text-secondary: #a0aec0; --bg-primary: #1a202c; --bg-secondary: #2d3748; --bg-assistant: #2a3441; --border-color: #4a5568; } }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Bình's Assistant</h1>
+    </header>
+
+    <div class="chat-container">
+        <div id="chat-box" class="chat-box" role="log" aria-live="polite" aria-label="Chat messages"></div>
+        <div class="input-container">
+            <div class="input-wrapper">
+                <div class="text-input-wrapper">
+                    <textarea id="user-input" placeholder="Nhập tin nhắn của bạn..." rows="1" aria-label="Nhập tin nhắn" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="true"></textarea>
+                </div>
+                <button id="send-btn" class="btn btn-primary" onclick="sendMessage()" aria-label="Gửi tin nhắn"><span id="send-text">➤</span></button>
+                <button id="record-btn" class="btn btn-secondary" onclick="toggleRecording()" aria-label="Ghi âm"><span id="record-text">🎤</span></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = { WEBHOOK_URL: 'https://zhubliberal.cloud/webhook/assistant', MAX_AUDIO_DURATION: 60000, REQUEST_TIMEOUT: 30000, MAX_RETRIES: 3 };
+        const state = { mediaRecorder: null, audioChunks: [], isRecording: false, messageIdCounter: 0 };
+        const chatBox = document.getElementById('chat-box'), userInput = document.getElementById('user-input');
+        
+        function generateId() { return `msg-${++state.messageIdCounter}-${Date.now()}`; }
+        function escapeHtml(text) { const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }; return text.replace(/[&<>"']/g, m => map[m]); }
+        function scrollToBottom() { requestAnimationFrame(() => { chatBox.scrollTop = chatBox.scrollHeight; }); }
+        function autoResize() { userInput.style.height = 'auto'; const newHeight = Math.min(userInput.scrollHeight, parseInt(getComputedStyle(userInput).maxHeight)); userInput.style.height = `${newHeight}px`; }
+        function addMessage(content, isUser = false, isError = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
+            messageDiv.id = generateId();
+            if (isError) {
+                messageDiv.innerHTML = `<div class="error-message">⚠️ ${escapeHtml(content)}</div>`;
+            } else {
+                const header = isUser ? 'Bạn' : 'Assistant';
+                const formattedContent = isUser ? `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>` : formatResponse(content);
+                messageDiv.innerHTML = `<div class="message-header">${header}</div><div class="message-content"><div class="message-text">${formattedContent}</div></div>`;
+            }
+            chatBox.appendChild(messageDiv);
+            scrollToBottom();
+        }
+        function addLoadingMessage(text = 'Đang xử lý') {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading-message';
+            loadingDiv.id = generateId();
+            loadingDiv.innerHTML = `<div class="loading-text">${escapeHtml(text)}</div><div class="loading-dots"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>`;
+            chatBox.appendChild(loadingDiv);
+            scrollToBottom();
+            return loadingDiv.id;
+        }
+        function removeElementById(id) { const element = document.getElementById(id); if (element) element.remove(); }
+        function formatResponse(response) { const rawHtml = marked.parse(response); return DOMPurify.sanitize(rawHtml); }
+        async function fetchWithRetry(url, options, retries = CONFIG.MAX_RETRIES) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+                    const response = await fetch(url, { ...options, signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    return response;
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+                }
+            }
+        }
+
+        // === HÀM SENDTON8N ĐÃ SỬA LỖI CUỐI CÙNG ===
+        async function sendToN8n(type, content) {
+            if (type === 'text') {
+                addMessage(content, true);
+            }
+            const loadingId = addLoadingMessage(type === 'audio' ? 'Đang xử lý âm thanh' : 'Đang xử lý');
+            try {
+                const formData = new FormData();
+                formData.append('type', type);
+                if (type === 'text') {
+                    formData.append('content', content);
+                } else if (type === 'audio') {
+                    formData.append('file', content, 'recording.webm');
+                }
+                const response = await fetchWithRetry(CONFIG.WEBHOOK_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                removeElementById(loadingId);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+                }
+                const result = await response.json();
+
+                // Đọc message trực tiếp từ object, vì backend trả về object chứ không phải array
+                const responseMessage = result.message || 'Không nhận được nội dung phản hồi.';
+                
+                addMessage(responseMessage, false);
+
+            } catch (error) {
+                removeElementById(loadingId);
+                console.error('Lỗi khi gửi dữ liệu:', error);
+                let errorMessage = 'Đã xảy ra lỗi khi xử lý yêu cầu của bạn.';
+                if (error.name === 'AbortError') {
+                    errorMessage = 'Yêu cầu đã hết thời gian chờ. Vui lòng thử lại.';
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
+                }
+                addMessage(errorMessage, false, true);
+            }
+        }
+        
+        async function toggleRecording() {
+            const recordBtn = document.getElementById('record-btn');
+            const recordText = document.getElementById('record-text');
+            if (!state.isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 } });
+                    state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+                    state.audioChunks = [];
+                    state.mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) state.audioChunks.push(event.data); };
+                    state.mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+                        stream.getTracks().forEach(track => track.stop());
+                        await sendToN8n('audio', audioBlob);
+                    };
+                    state.mediaRecorder.start();
+                    state.isRecording = true;
+                    recordBtn.className = 'btn btn-recording';
+                    recordText.textContent = '⏹️';
+                    recordBtn.setAttribute('aria-label', 'Dừng ghi âm');
+                    setTimeout(() => { if (state.isRecording) toggleRecording(); }, CONFIG.MAX_AUDIO_DURATION);
+                } catch (error) {
+                    console.error('Lỗi khi truy cập microphone:', error);
+                    let errorMessage = 'Không thể truy cập microphone.';
+                    if (error.name === 'NotAllowedError') errorMessage = 'Vui lòng cho phép truy cập microphone.';
+                    else if (error.name === 'NotFoundError') errorMessage = 'Không tìm thấy microphone.';
+                    addMessage(errorMessage, false, true);
+                }
+            } else {
+                if (state.mediaRecorder && state.mediaRecorder.state === 'recording') { state.mediaRecorder.stop(); }
+                state.isRecording = false;
+                recordBtn.className = 'btn btn-secondary';
+                recordText.textContent = '🎤';
+                recordBtn.setAttribute('aria-label', 'Ghi âm');
+            }
+        }
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+            userInput.value = '';
+            autoResize();
+            await sendToN8n('text', message);
+        }
+        userInput.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } });
+        userInput.addEventListener('input', autoResize);
+        window.addEventListener('load', () => { userInput.focus(); setTimeout(() => { addMessage('Xin chào! Tôi là Bình Assistant. Bạn cần hỗ trợ gì hôm nay?', false); }, 500); });
+    </script>
+</body>
+</html>
